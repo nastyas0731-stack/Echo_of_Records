@@ -12,8 +12,7 @@ namespace Echo_of_Records.Models
             Rect = new RectangleF(x, y, width, height);
         }
 
-        // Этот метод возвращает 4 угла прямоугольника. 
-        // Именно через них мы будем "протягивать" лучи тени.
+       
         public PointF[] GetVertices()
         {
             return new PointF[]

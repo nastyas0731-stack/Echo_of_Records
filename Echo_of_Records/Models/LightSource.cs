@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Echo_of_Records.Models
 {
-    // Этот класс просто хранит координаты нашей магической свечи
+    //координаты  свечи
     public class LightSource
     {
         public float X { get; set; }
