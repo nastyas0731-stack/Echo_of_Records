@@ -1,44 +1,44 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Drawing;
 
 namespace Echo_of_Records.Models
 {
     public class Player
     {
-        // Позиция и физика
-        public PointF Position;
-        public float VelocityY = 0;
-        public float VisualY;
+        public PointF Position { get; set; }
+        public float VelocityY { get; set; }
+        public bool IsGrounded { get; set; }
+        public float CurrentAlpha { get; set; } = 1.0f;
+        public float VisualY { get; set; }
+        public float GlowAlpha { get; set; } = 0f;
 
-        // Константы движения
-        public const float Speed = 5f;
-        public const float JumpForce = -12f;
-        public const float Gravity = 0.8f;
+        public float Gravity { get; set; } = 1.8f;
+        public float JumpForce { get; set; } = -25f;
+        public float Speed { get; set; } = 15f;
 
-        // Состояние и размеры
-        public bool IsGrounded = false;
-        public float Width = 130;
-        public float Height = 130;
+        public int Width { get; set; } = 120;
+        public int Height { get; set; } = 150;
 
-        // Эффект тени (свечение)
-        public float CurrentAlpha = 1.0f;
+        public RectangleF Bounds => new RectangleF(Position.X, Position.Y, Width, Height);
 
-        // Хитбокс: специально заужен (30 пикселей с боков), чтобы не застревать в углах
-        public Rectangle Bounds => new Rectangle(
-            (int)Position.X + 30,
-            (int)Position.Y + 10,
-            (int)Width - 60,
-            (int)Height - 20
-        );
+        private float _floatTimer = 0; // Для эффекта парения
 
         public Player(float x, float y)
         {
             Position = new PointF(x, y);
             VisualY = y;
+            IsGrounded = false;
+        }
+        public void Update()
+        {
+            // Эффект легкого покачивания в воздухе
+            _floatTimer += 0.1f;
+            float floatOffset = IsGrounded ? 0 : (float)Math.Sin(_floatTimer) * 5;
+            VisualY = Position.Y + floatOffset;
+
+            // Логика свечения (плавное появление)
+            if (CurrentAlpha < 1.0f) GlowAlpha = Math.Min(1.0f, GlowAlpha + 0.05f);
+            else GlowAlpha = Math.Max(0f, GlowAlpha - 0.05f);
         }
     }
 }

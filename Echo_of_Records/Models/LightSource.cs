@@ -1,12 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Echo_of_Records.Models
+﻿namespace Echo_of_Records.Models
 {
-    //координаты  свечи
     public class LightSource
     {
         public float X { get; set; }

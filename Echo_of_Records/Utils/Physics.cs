@@ -1,27 +1,22 @@
 ﻿using System.Drawing;
+using System.Linq;
 
 namespace Echo_of_Records.Utils
 {
     public static class Physics
     {
-        public static bool IsPointInPolygon(PointF point, PointF[] polygon)
+        public static bool IsPointInPolygon(PointF p, PointF[] poly)
         {
-            bool result = false;
-            int j = polygon.Length - 1;
-            for (int i = 0; i < polygon.Length; i++)
+            bool isInside = false;
+            for (int i = 0, j = poly.Length - 1; i < poly.Length; j = i++)
             {
-                if (polygon[i].Y < point.Y && polygon[j].Y >= point.Y ||
-                    polygon[j].Y < point.Y && polygon[i].Y >= point.Y)
+                if (((poly[i].Y > p.Y) != (poly[j].Y > p.Y)) &&
+                (p.X < (poly[j].X - poly[i].X) * (p.Y - poly[i].Y) / (poly[j].Y - poly[i].Y) + poly[i].X))
                 {
-                    if (polygon[i].X + (point.Y - polygon[i].Y) /
-                       (polygon[j].Y - polygon[i].Y) * (polygon[j].X - polygon[i].X) < point.X)
-                    {
-                        result = !result;
-                    }
+                    isInside = !isInside;
                 }
-                j = i;
             }
-            return result;
+            return isInside;
         }
     }
 }
