@@ -19,6 +19,19 @@ namespace Echo_of_Records.Models
         // Движущиеся платформы (летающие книги)
         public List<MovingObstacle> MovingPlatforms { get; set; }
 
+        // В LevelData.cs добавь новый список
+        public List<Rectangle> GlowingPlatforms { get; set; } = new List<Rectangle>();
+
+        // В классе, где ты описываешь уровни (LevelData)
+        public List<Rectangle> LavaPlatforms { get; set; } = new List<Rectangle>();
+
+        public PointF FinishPoint { get; set; }
+        public List<MemoryNote> Notes { get; set; } = new List<MemoryNote>();
+
+        // И GlowingPlatforms тоже проверь на всякий случай
+        public List<Rectangle> Platforms { get; set; } = new List<Rectangle>();
+
+
         public LevelData(string name, PointF spawn, RectangleF finish)
         {
             Name = name;

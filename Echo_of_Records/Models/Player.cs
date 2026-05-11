@@ -12,8 +12,8 @@ namespace Echo_of_Records.Models
         public float VisualY { get; set; }
         public float GlowAlpha { get; set; } = 0f;
 
-        public float Gravity { get; set; } = 1.8f;
-        public float JumpForce { get; set; } = -25f;
+        public float Gravity { get; set; } = 2.0f;
+        public float JumpForce { get; set; } = -18f;
         public float Speed { get; set; } = 15f;
 
         public int Width { get; set; } = 120;

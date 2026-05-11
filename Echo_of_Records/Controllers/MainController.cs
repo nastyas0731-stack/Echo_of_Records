@@ -6,6 +6,9 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
+using WMPLib;          // Для фоновой музыки (нужно добавить через COM выше)
+using System.Media;    // Для звуков выстрелов/сбора (стандартная)
+using System.IO;
 
 namespace Echo_of_Records.Controllers
 {
@@ -32,15 +35,9 @@ namespace Echo_of_Records.Controllers
         public void Update()
         {
             _timer += 0.15f;
-
             float baseAlpha = 0.4f + (float)Math.Abs(Math.Sin(_timer)) * 0.4f;
-
-            if (_rnd.Next(100) > 90)
-                CurrentAlpha = (float)_rnd.NextDouble() * 0.3f;
-            else
-                CurrentAlpha = baseAlpha;
-
-            //ГОРИЗОНТАЛЬНОЕ ДРОЖАНИЕ
+            if (_rnd.Next(100) > 90) CurrentAlpha = (float)_rnd.NextDouble() * 0.3f;
+            else CurrentAlpha = baseAlpha;
             _driftOffset = (float)Math.Sin(_timer * 2f) * 10f;
         }
 
@@ -48,23 +45,17 @@ namespace Echo_of_Records.Controllers
         {
             GraphicsPath path = new GraphicsPath();
             float halfW = Width / 2f;
-
-            // Добавляем дрифт к координате X для эффекта нестабильности
             float currentX = X + _driftOffset;
-
-            PointF[] pts = new PointF[]
-            {
-            new PointF(currentX - halfW, Y),
-            new PointF(currentX + halfW, Y),
-            new PointF(currentX + halfW, Y + Height),
-            new PointF(currentX - halfW, Y + Height)
+            PointF[] pts = new PointF[] {
+                new PointF(currentX - halfW, Y),
+                new PointF(currentX + halfW, Y),
+                new PointF(currentX + halfW, Y + Height),
+                new PointF(currentX - halfW, Y + Height)
             };
-
             if (Angle != 0)
             {
                 using (Matrix m = new Matrix())
                 {
-                    // Добавляем небольшое "качание" угла
                     float dynamicAngle = Angle + (float)Math.Sin(_timer * 0.5f) * 2f;
                     m.RotateAt(dynamicAngle, new PointF(currentX, Y));
                     m.TransformPoints(pts);
@@ -80,31 +71,24 @@ namespace Echo_of_Records.Controllers
             {
                 RectangleF bounds = path.GetBounds();
                 if (bounds.Width <= 0) return;
-
-                using (LinearGradientBrush lgb = new LinearGradientBrush(
-                    new PointF(bounds.Left, 0),
-                    new PointF(bounds.Right, 0),
-                    Color.Transparent,
-                    Color.Transparent))
+                using (PathGradientBrush glowBrush = new PathGradientBrush(path))
+                {
+                    int glowAlpha = (int)(100 * CurrentAlpha);
+                    glowBrush.CenterColor = Color.FromArgb(glowAlpha, Color.Cyan);
+                    glowBrush.SurroundColors = new Color[] { Color.Transparent };
+                    g.FillPath(glowBrush, path);
+                }
+                using (LinearGradientBrush lgb = new LinearGradientBrush(new PointF(bounds.Left, 0), new PointF(bounds.Right, 0), Color.Transparent, Color.Transparent))
                 {
                     Color blendColor = Color.FromArgb((int)(255 * CurrentAlpha), Color.White);
-
-                    ColorBlend cb = new ColorBlend();
-                    cb.Colors = new Color[] {
-                Color.Transparent,
-                blendColor,
-                blendColor,
-                Color.Transparent
-            };
-
-                    cb.Positions = new float[] { 0f, 0.15f, 0.85f, 1f };
+                    ColorBlend cb = new ColorBlend
+                    {
+                        Colors = new Color[] { Color.Transparent, blendColor, blendColor, Color.Transparent },
+                        Positions = new float[] { 0f, 0.15f, 0.85f, 1f }
+                    };
                     lgb.InterpolationColors = cb;
-
-                    // Рисуем сам луч
                     g.FillPath(lgb, path);
-
-                    // Добавляем "ядро" — еще более плотную полоску в самом центре для сочности
-                    using (Pen corePen = new Pen(Color.FromArgb((int)(100 * CurrentAlpha), Color.White), bounds.Width * 0.3f))
+                    using (Pen corePen = new Pen(Color.FromArgb((int)(150 * CurrentAlpha), Color.White), bounds.Width * 0.2f))
                     {
                         float centerX = bounds.Left + bounds.Width / 2f;
                         g.DrawLine(corePen, centerX, bounds.Top, centerX, bounds.Bottom);
@@ -113,19 +97,25 @@ namespace Echo_of_Records.Controllers
             }
         }
     }
+
     public class MainController
     {
+        // --- Свойства NPC ---
+        public bool IsNpcTriggered { get; private set; } = false;
+        public bool IsNpcVanished { get; private set; } = false;
+        private int _npcDisplayCounter = 0;
+        private const int NPC_LIFETIME = 180;
+        public PointF NpcPosition { get; set; } = new PointF(520, 230);
+
+        // --- Остальные свойства ---
         public LightSource Light { get; private set; }
         public Player Player { get; private set; }
         public LevelManager LevelManager { get; private set; }
         public GameState State { get; set; } = GameState.MainMenu;
-
         private HashSet<Keys> pressedKeys = new HashSet<Keys>();
-        public PointF FinishPoint { get; set; } = new PointF(1850, 500);
         public List<Rectangle> Obstacles => LevelManager.GetCurrentLevel()?.Obstacles ?? new List<Rectangle>();
         public List<MovingObstacle> MovingPlatforms => LevelManager.GetCurrentLevel()?.MovingPlatforms ?? new List<MovingObstacle>();
         public List<LightRift> Rifts { get; set; } = new List<LightRift>();
-
         public float CandleLife { get; set; } = 100f;
 
         public MainController()
@@ -134,7 +124,6 @@ namespace Echo_of_Records.Controllers
             var level = LevelManager.GetCurrentLevel();
             Light = new LightSource(400, 300);
             Player = (level != null) ? new Player(level.SpawnPoint.X, level.SpawnPoint.Y) : new Player(100, 500);
-
             InitializeRifts();
         }
 
@@ -146,47 +135,71 @@ namespace Echo_of_Records.Controllers
             Rifts.Add(new LightRift(1500, -100, 120, 1500, 12));
         }
 
-        public void KeyUp(Keys key) => pressedKeys.Remove(key);
-        public void UpdateLightPosition(float x, float y) { Light.X = (int)x; Light.Y = (int)y; }
-
-        private bool CheckIfInLightRift()
-        {
-            PointF p = new PointF(Player.Position.X + Player.Width / 2, Player.Position.Y + Player.Height / 2);
-            foreach (var rift in Rifts)
-            {
-                using (var path = rift.GetPath())
-                {
-                    if (IsPointInPolygon(path.PathPoints, p)) return true;
-                }
-            }
-            return false;
-        }
-
         public void Update()
         {
+            if (State != GameState.Playing) return;
+
             var currentLevel = LevelManager.GetCurrentLevel();
             if (currentLevel != null)
             {
+                // Появление Духа на 4 уровне (индекс 3)
+                if (LevelManager.CurrentLevelIndex == 3)
+                {
+                    NpcPosition = new PointF(750, 720);
+                }
+
+                // Сбор записок
+                // Сбор записок (Улучшенная версия)
+                // Сбор записок (Универсальная версия)
+                foreach (var note in currentLevel.Notes.Where(n => !n.IsCollected))
+                {
+                    // 1. Пробуем стандартное пересечение (как было раньше)
+                    bool isTouched = Player.Bounds.IntersectsWith(note.Bounds);
+
+                    // 2. Дополнительная проверка на дистанцию (если игрок пролетел мимо)
+                    // Используем фиксированные числа, если Width/Height вдруг пустые
+                    float pX = Player.Position.X + 60;
+                    float pY = Player.Position.Y + 75;
+                    float nX = note.Bounds.X + note.Bounds.Width / 2;
+                    float nY = note.Bounds.Y + note.Bounds.Height / 2;
+
+                    double dist = Math.Sqrt(Math.Pow(pX - nX, 2) + Math.Pow(pY - nY, 2));
+
+                    // Если хоть одно условие сработало — забираем!
+                    if (isTouched || dist < 100)
+                    {
+                        note.IsCollected = true;
+
+                        // Активируем духа
+                        IsNpcTriggered = true;
+                        _npcDisplayCounter = 0;
+                    }
+                }
+
+                // Обновление состояния NPC (встроено в основной Update)
+                if (IsNpcTriggered && !IsNpcVanished)
+                {
+                    _npcDisplayCounter++;
+                    if (_npcDisplayCounter >= NPC_LIFETIME) IsNpcVanished = true;
+                }
+
+                // Переход на следующий уровень
                 if (Player.Bounds.IntersectsWith(currentLevel.FinishZone))
                 {
-                    // Идем на следующий уровень
                     LevelManager.NextLevel();
-
                     ResetToLevelSpawn();
-
-                    return; // Выходим из Update, чтобы начать новый уровень с чистого листа
+                    IsNpcTriggered = false;
+                    IsNpcVanished = false;
+                    return;
                 }
             }
 
-            if (State != GameState.Playing) return;
-
-            // 1. Двигаем платформы
             foreach (var platform in MovingPlatforms) platform.Update();
-
-            // 2. Проверка падения за экран (Респаун)
             if (Player.Position.Y > 1200) ResetToLevelSpawn();
-
-            foreach (var rift in Rifts) rift.Update();
+            if (LevelManager.CurrentLevelIndex != 4)
+            {
+                foreach (var rift in Rifts) rift.Update();
+            }
 
             CandleLife -= 0.05f;
             if (CandleLife <= 0) ResetToLevelSpawn();
@@ -198,27 +211,36 @@ namespace Echo_of_Records.Controllers
             {
                 if (Player.VelocityY > 8.0f) Player.VelocityY = 8.0f;
                 Player.CurrentAlpha = Math.Min(1.0f, Player.CurrentAlpha + 0.05f);
-                ApplyNormalGravity();
-            }
-            else if (isInRift)
-            {
-                CandleLife -= 0.8f;
-                Player.CurrentAlpha = Math.Max(0.2f, Player.CurrentAlpha - 0.03f);
-                ApplyNormalGravity();
             }
             else
             {
-                Player.CurrentAlpha = Math.Max(0.2f, Player.CurrentAlpha - 0.01f);
-                ApplyNormalGravity();
+                Player.CurrentAlpha = Math.Max(0.2f, Player.CurrentAlpha - (isInRift ? 0.03f : 0.01f));
+                if (isInRift) CandleLife -= 0.8f;
             }
 
+            Player.VelocityY += Player.Gravity;
             Player.Position = new PointF(Player.Position.X, Player.Position.Y + Player.VelocityY);
+
             HandleHorizontalMovement();
             HandleCollisions();
             Player.Update();
         }
 
-        private void ApplyNormalGravity() => Player.VelocityY += Player.Gravity;
+        public float GetNpcAlpha()
+        {
+            if (!IsNpcTriggered || IsNpcVanished) return 0;
+            // Плавное появление (первые 20 кадров) и исчезновение (последние 40 кадров)
+            if (_npcDisplayCounter > NPC_LIFETIME - 40) return Math.Max(0, (NPC_LIFETIME - _npcDisplayCounter) / 40f);
+            if (_npcDisplayCounter < 20) return _npcDisplayCounter / 20f;
+            return 1.0f;
+        }
+
+        public void TriggerNpc()
+        {
+            IsNpcTriggered = true;
+            IsNpcVanished = false;
+            _npcDisplayCounter = 0;
+        }
 
         private void HandleHorizontalMovement()
         {
@@ -234,24 +256,15 @@ namespace Echo_of_Records.Controllers
             Player.IsGrounded = false;
             Rectangle feet = new Rectangle((int)Player.Position.X + 40, (int)Player.Position.Y + (int)Player.Height - 15, (int)Player.Width - 80, 20);
 
-            // Проверка обычных препятствий
-            foreach (var obs in Obstacles)
+            var allPlatforms = Obstacles.Concat(MovingPlatforms.Select(p => Rectangle.Round(p.Bounds)));
+            foreach (var obs in allPlatforms)
             {
                 if (feet.IntersectsWith(obs) && Player.VelocityY >= 0)
                 {
                     Player.Position = new PointF(Player.Position.X, obs.Top - Player.Height + 10);
-                    Player.VelocityY = 0; Player.IsGrounded = true; return;
-                }
-            }
-
-            // 3. Коллизия с движущимися книгами-лифтами
-            foreach (var mp in MovingPlatforms)
-            {
-                Rectangle platformRect = Rectangle.Round(mp.Bounds);
-                if (feet.IntersectsWith(platformRect) && Player.VelocityY >= 0)
-                {
-                    Player.Position = new PointF(Player.Position.X, platformRect.Top - Player.Height + 10);
-                    Player.VelocityY = 0; Player.IsGrounded = true; return;
+                    Player.VelocityY = 0;
+                    Player.IsGrounded = true;
+                    return;
                 }
             }
         }
@@ -260,28 +273,25 @@ namespace Echo_of_Records.Controllers
         {
             var level = LevelManager.GetCurrentLevel();
             if (level == null) return false;
-
-            // Точка под ногами духа для проверки
             PointF pt = new PointF(Player.Position.X + Player.Width / 2, Player.Position.Y + Player.Height - 5);
-
-            // 1. Сначала объединяем все объекты, которые могут отбрасывать тень
-            // Берем обычные полки и добавляем к ним прямоугольники движущихся книг
-            var allShadowCasters = level.Obstacles
-                .Concat(MovingPlatforms.Select(p => Rectangle.Round(p.Bounds)))
-                .ToList();
+            var allShadowCasters = level.Obstacles.Concat(MovingPlatforms.Select(p => Rectangle.Round(p.Bounds)));
 
             foreach (var rect in allShadowCasters)
             {
-                // Проверяем, стоит ли дух прямо внутри книги 
                 if (rect.Contains((int)pt.X, (int)pt.Y)) return true;
-
-                // Генерируем тень для каждого объекта (включая движущиеся)
                 var poly = ShadowEngine.GetShadowPolygon(rect, Light, 3000, 3000);
+                if (poly != null && IsPointInPolygon(poly, pt)) return true;
+            }
+            return false;
+        }
 
-                if (poly != null && poly.Length > 2)
-                {
-                    if (IsPointInPolygon(poly, pt)) return true;
-                }
+        private bool CheckIfInLightRift()
+        {
+            PointF p = new PointF(Player.Position.X + Player.Width / 2, Player.Position.Y + Player.Height / 2);
+            foreach (var rift in Rifts)
+            {
+                using (var path = rift.GetPath())
+                    if (IsPointInPolygon(path.PathPoints, p)) return true;
             }
             return false;
         }
@@ -293,10 +303,8 @@ namespace Echo_of_Records.Controllers
             for (int i = 0; i < polygon.Length; i++)
             {
                 if ((polygon[i].Y < testPoint.Y && polygon[j].Y >= testPoint.Y) || (polygon[j].Y < testPoint.Y && polygon[i].Y >= testPoint.Y))
-                {
                     if (polygon[i].X + (testPoint.Y - polygon[i].Y) / (polygon[j].Y - polygon[i].Y) * (polygon[j].X - polygon[i].X) < testPoint.X)
                         result = !result;
-                }
                 j = i;
             }
             return result;
@@ -328,5 +336,7 @@ namespace Echo_of_Records.Controllers
                 else if (CheckIfFeetInShadow()) Player.VelocityY = Player.JumpForce * 0.7f;
             }
         }
+        public void KeyUp(Keys key) => pressedKeys.Remove(key);
+        public void UpdateLightPosition(float x, float y) { Light.X = (int)x; Light.Y = (int)y; }
     }
 }
