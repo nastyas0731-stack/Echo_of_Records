@@ -21,7 +21,7 @@ namespace Echo_of_Records.Models
 
         public RectangleF Bounds => new RectangleF(Position.X, Position.Y, Width, Height);
 
-        private float _floatTimer = 0; // Для эффекта парения
+        private float _floatTimer = 0;
 
         public Player(float x, float y)
         {
@@ -31,12 +31,10 @@ namespace Echo_of_Records.Models
         }
         public void Update()
         {
-            // Эффект легкого покачивания в воздухе
             _floatTimer += 0.1f;
             float floatOffset = IsGrounded ? 0 : (float)Math.Sin(_floatTimer) * 5;
             VisualY = Position.Y + floatOffset;
 
-            // Логика свечения (плавное появление)
             if (CurrentAlpha < 1.0f) GlowAlpha = Math.Min(1.0f, GlowAlpha + 0.05f);
             else GlowAlpha = Math.Max(0f, GlowAlpha - 0.05f);
         }

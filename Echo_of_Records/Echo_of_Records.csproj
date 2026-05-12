@@ -94,7 +94,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Views\" />
+    <Folder Include="Views\Новая папка\" />
   </ItemGroup>
 
 </Project>

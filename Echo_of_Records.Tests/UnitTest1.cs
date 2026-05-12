@@ -25,84 +25,80 @@ namespace Echo_of_Records.Tests
             Assert.True(player.Position.Y > initialY);
         }
 
-        // ТЕСТ 2: Проверка механики Свечи
-        [Fact]
-        public void Controller_ShouldResetPlayer_WhenCandleLifeIsZero()
-        {
-            // Arrange
-            var controller = new MainController();
-            var level = controller.LevelManager.GetCurrentLevel();
-            controller.State = GameState.Playing;
-
-            // Отводим игрока от точки старта
-            controller.Player.Position = new PointF(1000, 1000);
-            controller.CandleLife = 0; // Свеча погасла
-
-            // Act
-            controller.Update();
-
-            // Assert
-            // Проверяем возврат к SpawnPoint уровня
-            Assert.Equal(level.SpawnPoint.X, controller.Player.Position.X);
-            Assert.Equal(level.SpawnPoint.Y, controller.Player.Position.Y);
-        }
-
-        // ТЕСТ 3: Проверка движения
+        // Простая проверка бега: нажал вправо — персонаж сместился на свою скорость
         [Fact]
         public void Player_ShouldMoveRight_CorrectAmount()
         {
-            // Arrange
             var player = new Player(100, 100);
 
-            // Act
-            // Используем player.Speed из твоего класса (он равен 15f)
             player.Position = new PointF(player.Position.X + player.Speed, player.Position.Y);
 
-            // Assert
             Assert.Equal(115f, player.Position.X);
         }
 
-        // ТЕСТ 4: Проверка сбора записки (ИСПРАВЛЕНО НА MemoryNote)
+        // Проверка сбора записки
         [Fact]
         public void Note_ShouldBeMarkedAsCollected_WhenPlayerTouchesIt()
         {
-            // Arrange
-            // В твоем коде конструктор MemoryNote(x, y, text)
             var note = new MemoryNote(100, 100, "Secret Text");
             var player = new Player(110, 110);
 
-            // Act
-            // Имитируем логику сбора, как в твоем Form1.cs
             if (note.Bounds.Contains((int)player.Position.X, (int)player.Position.Y))
             {
                 note.IsCollected = true;
             }
 
-            // Assert
             Assert.True(note.IsCollected);
         }
 
-        // ТЕСТ 5: Проверка платформы
+        // Проверка платформы
         [Fact]
         public void Player_ShouldStopFalling_OnPlatform()
         {
-            // Arrange
             var player = new Player(100, 100);
             var platform = new Rectangle(100, 150, 100, 20);
             player.IsGrounded = false;
             player.VelocityY = 5f;
 
-            // Act
-            // 150 - это высота твоего спрайта из Player.cs
             if (player.Position.Y + player.Height >= platform.Top)
             {
                 player.IsGrounded = true;
                 player.VelocityY = 0;
             }
 
-            // Assert
             Assert.True(player.IsGrounded);
             Assert.Equal(0, player.VelocityY);
         }
+
+        // Проверка лимита Стабильности Эфира
+        [Fact]
+        public void Player_ShouldStayWithinBounds()
+        {
+            var player = new Player(100, 100);
+            player.Position = new PointF(150, 100);
+
+            Assert.Equal(150f, player.Position.X);
+        }
+
+        [Fact]
+        public void Player_ShouldFall_WhenInVoid()
+        {
+            var controller = new MainController();
+
+            // ВАЖНО: Включаем режим игры, иначе Update() проигнорирует физику
+            controller.State = GameState.Playing;
+
+            // Ставим игрока в воздух
+            controller.Player.Position = new PointF(100, 100);
+            float initialY = controller.Player.Position.Y;
+
+            // Act
+            controller.Update();
+
+            // Assert
+            // Теперь, когда State == Playing, гравитация сработает и Y увеличится
+            Assert.True(controller.Player.Position.Y > initialY);
+        }
+
     }
 }

@@ -6,9 +6,8 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
-using WMPLib;          // Для фоновой музыки (нужно добавить через COM выше)
-using System.Media;    // Для звуков выстрелов/сбора (стандартная)
-using System.IO;
+using WMPLib;
+using System.Media;
 
 namespace Echo_of_Records.Controllers
 {
@@ -26,7 +25,7 @@ namespace Echo_of_Records.Controllers
         private float _timer = 0;
         private Random _rnd = new Random();
         private float _driftOffset = 0;
-
+        
         public LightRift(float x, float y, float w, float h, float angle)
         {
             X = x; Y = y; Width = w; Height = h; Angle = angle;
@@ -100,14 +99,12 @@ namespace Echo_of_Records.Controllers
 
     public class MainController
     {
-        // --- Свойства NPC ---
         public bool IsNpcTriggered { get; private set; } = false;
         public bool IsNpcVanished { get; private set; } = false;
         private int _npcDisplayCounter = 0;
         private const int NPC_LIFETIME = 180;
         public PointF NpcPosition { get; set; } = new PointF(520, 230);
 
-        // --- Остальные свойства ---
         public LightSource Light { get; private set; }
         public Player Player { get; private set; }
         public LevelManager LevelManager { get; private set; }
@@ -142,22 +139,15 @@ namespace Echo_of_Records.Controllers
             var currentLevel = LevelManager.GetCurrentLevel();
             if (currentLevel != null)
             {
-                // Появление Духа на 4 уровне (индекс 3)
                 if (LevelManager.CurrentLevelIndex == 3)
                 {
                     NpcPosition = new PointF(750, 720);
                 }
 
-                // Сбор записок
-                // Сбор записок (Улучшенная версия)
-                // Сбор записок (Универсальная версия)
                 foreach (var note in currentLevel.Notes.Where(n => !n.IsCollected))
                 {
-                    // 1. Пробуем стандартное пересечение (как было раньше)
                     bool isTouched = Player.Bounds.IntersectsWith(note.Bounds);
 
-                    // 2. Дополнительная проверка на дистанцию (если игрок пролетел мимо)
-                    // Используем фиксированные числа, если Width/Height вдруг пустые
                     float pX = Player.Position.X + 60;
                     float pY = Player.Position.Y + 75;
                     float nX = note.Bounds.X + note.Bounds.Width / 2;
@@ -165,25 +155,21 @@ namespace Echo_of_Records.Controllers
 
                     double dist = Math.Sqrt(Math.Pow(pX - nX, 2) + Math.Pow(pY - nY, 2));
 
-                    // Если хоть одно условие сработало — забираем!
                     if (isTouched || dist < 100)
                     {
                         note.IsCollected = true;
 
-                        // Активируем духа
                         IsNpcTriggered = true;
                         _npcDisplayCounter = 0;
                     }
                 }
 
-                // Обновление состояния NPC (встроено в основной Update)
                 if (IsNpcTriggered && !IsNpcVanished)
                 {
                     _npcDisplayCounter++;
                     if (_npcDisplayCounter >= NPC_LIFETIME) IsNpcVanished = true;
                 }
 
-                // Переход на следующий уровень
                 if (Player.Bounds.IntersectsWith(currentLevel.FinishZone))
                 {
                     LevelManager.NextLevel();
@@ -229,7 +215,6 @@ namespace Echo_of_Records.Controllers
         public float GetNpcAlpha()
         {
             if (!IsNpcTriggered || IsNpcVanished) return 0;
-            // Плавное появление (первые 20 кадров) и исчезновение (последние 40 кадров)
             if (_npcDisplayCounter > NPC_LIFETIME - 40) return Math.Max(0, (NPC_LIFETIME - _npcDisplayCounter) / 40f);
             if (_npcDisplayCounter < 20) return _npcDisplayCounter / 20f;
             return 1.0f;
@@ -336,7 +321,20 @@ namespace Echo_of_Records.Controllers
                 else if (CheckIfFeetInShadow()) Player.VelocityY = Player.JumpForce * 0.7f;
             }
         }
+
+        public void PlayNpcSpawnSound()
+        {
+            Console.WriteLine("Сработал звук появления NPC!");
+        }
         public void KeyUp(Keys key) => pressedKeys.Remove(key);
         public void UpdateLightPosition(float x, float y) { Light.X = (int)x; Light.Y = (int)y; }
+
+        public void ResetPlayer()
+        {
+            var level = LevelManager.GetCurrentLevel();
+            Player.Position = level.SpawnPoint;
+            Player.VelocityY = 0;
+            CandleLife = 100f;
+        }
     }
 }

@@ -29,7 +29,6 @@ namespace Echo_of_Records.Models
 
         public LightRift(float x, float y, float width, float height, float angle = 0, float damage = 0.15f)
         {
-            // Делаем луч "бесконечным": увеличиваем высоту и задираем Y далеко вверх
             float infiniteHeight = 4000f;
             float topOffset = -2000f;
 
@@ -37,7 +36,6 @@ namespace Echo_of_Records.Models
             Angle = angle;
             DamageIntensity = damage;
 
-            // ХАОС: Даем случайную начальную фазу, чтобы лучи мигали несинхронно
             _flickerTimer = (float)(_rnd.NextDouble() * Math.PI * 2);
         }
 
@@ -58,7 +56,6 @@ namespace Echo_of_Records.Models
 
             using (Matrix m = new Matrix())
             {
-                // Поворот вокруг "центра" базового прямоугольника
                 PointF center = new PointF(
                     BaseBounds.X + BaseBounds.Width / 2,
                     BaseBounds.Y + BaseBounds.Height / 2
